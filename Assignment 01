@@ -1,0 +1,54 @@
+import java.util.concurrent.atomic.AtomicLong;
+
+public class Mila_Thread implements Runnable {
+    static final AtomicLong safeCount = new AtomicLong(); // Experiment A (thread-safe)
+    static long unsafeCount = 0;                          // Experiment B (unsynchronized)
+    long instanceCount = 0;                               // non-static counter
+    final long increments;
+    final boolean safe;
+
+    Mila_Thread(long increments, boolean safe) {
+        this.increments = increments;
+        this.safe = safe;
+    }
+
+    public void run() {
+        for (long i = 0; i < increments; i++) {
+            if (safe) safeCount.incrementAndGet();
+            else unsafeCount++;
+            instanceCount++;
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        int n = Integer.parseInt(args[0]);
+        long m = Long.parseLong(args[1]);
+        boolean safe = Boolean.parseBoolean(args[2]);
+
+        Mila_Thread[] tasks = new Mila_Thread[n];
+        Thread[] threads = new Thread[n];
+        for (int i = 0; i < n; i++) {
+            tasks[i] = new Mila_Thread(m, safe);
+            threads[i] = new Thread(tasks[i]);
+            threads[i].start();
+        }
+        for (int i = 0; i < n; i++) threads[i].join();
+
+        long staticTotal = safe ? safeCount.get() : unsafeCount;
+        long nonStaticTotal = 0;
+        for (Mila_Thread t : tasks) nonStaticTotal += t.instanceCount;
+
+        long expected = n * m;
+        long diff = Math.abs(staticTotal - nonStaticTotal);
+        double pct = (nonStaticTotal == 0) ? (staticTotal == 0 ? 0 : Double.NaN)
+                                           : diff * 100.0 / nonStaticTotal;
+
+        System.out.println("Threads: " + n + ", Increments/thread: " + m
+                + ", Thread-safe: " + safe);
+        System.out.println("Expected: " + expected);
+        System.out.println("Static count: " + staticTotal);
+        System.out.println("Non-static total: " + nonStaticTotal);
+        System.out.println("Absolute difference: " + diff);
+        System.out.printf("Difference (%%): %.4f%n", pct);
+    }
+}
